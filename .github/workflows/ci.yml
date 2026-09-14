@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  metadata:
+    name: Validate metadata
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install validators
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            appstream \
+            desktop-file-utils
+
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      - name: Validate desktop and AppStream metadata
+        run: just validate-metadata
+
+  check:
+    name: Check and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: 1.98.0
+          components: rustfmt, clippy
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            appstream \
+            desktop-file-utils \
+            pkg-config \
+            libwayland-dev \
+            libxkbcommon-dev
+
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+
+      - name: Run checks
+        run: just ci
+
+      - name: Validate generated metadata
+        run: just validate-generated-metadata
+
+  flatpak:
+    name: Flatpak build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Flatpak builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            elfutils \
+            flatpak \
+            flatpak-builder \
+            librsvg2-common
+          flatpak remote-add --if-not-exists --user flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Build Flatpak
+        run: |
+          flatpak-builder \
+            --force-clean \
+            --install-deps-from=flathub \
+            --user \
+            flatpak-build \
+            flatpak/org.cosmic_utils.CosmicExtAppletContainerManager.json
+
+  release-install:
+    name: Release build and staged install
+    needs: [metadata, check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: 1.98.0
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            appstream \
+            desktop-file-utils \
+            pkg-config \
+            libwayland-dev \
+            libxkbcommon-dev
+
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      - name: Build release binary
+        run: just build-release
+
+      - name: Verify staged installation
+        run: |
+          set -euo pipefail
+          stage="$RUNNER_TEMP/stage"
+          just rootdir="$stage" prefix=/usr install
+
+          test -x "$stage/usr/bin/cosmic-ext-applet-container-manager"
+          test -f "$stage/usr/share/applications/org.cosmic_utils.CosmicExtAppletContainerManager.desktop"
+          test -f "$stage/usr/share/metainfo/org.cosmic_utils.CosmicExtAppletContainerManager.metainfo.xml"
+          test -f "$stage/usr/share/icons/hicolor/scalable/apps/org.cosmic_utils.CosmicExtAppletContainerManager-symbolic.svg"
+
+          desktop-file-validate \
+            "$stage/usr/share/applications/org.cosmic_utils.CosmicExtAppletContainerManager.desktop"
+          appstreamcli validate --no-net \
+            "$stage/usr/share/metainfo/org.cosmic_utils.CosmicExtAppletContainerManager.metainfo.xml"
+
+          just rootdir="$stage" prefix=/usr uninstall
+          test ! -e "$stage/usr/bin/cosmic-ext-applet-container-manager"
+          test ! -e "$stage/usr/share/applications/org.cosmic_utils.CosmicExtAppletContainerManager.desktop"
+          test ! -e "$stage/usr/share/metainfo/org.cosmic_utils.CosmicExtAppletContainerManager.metainfo.xml"
+          test ! -e "$stage/usr/share/icons/hicolor/scalable/apps/org.cosmic_utils.CosmicExtAppletContainerManager-symbolic.svg"

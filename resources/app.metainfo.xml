@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.cosmic_utils.CosmicExtAppletContainerManager</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <name>Container Manager</name>
+  <summary>Manage Docker and Podman containers from COSMIC™ Desktop</summary>
+  <developer id="org.cosmic_utils">
+    <name>Frederic Laing</name>
+  </developer>
+  <url type="homepage">https://github.com/cosmic-utils/cosmic-ext-applet-container-manager</url>
+  <url type="bugtracker">https://github.com/cosmic-utils/cosmic-ext-applet-container-manager/issues</url>
+  <description>
+    <p>Container Manager discovers local Docker and Podman containers and provides start, stop, restart, and safe non-force removal actions.</p>
+  </description>
+  <icon type="stock">org.cosmic_utils.CosmicExtAppletContainerManager-symbolic</icon>
+  <launchable type="desktop-id">org.cosmic_utils.CosmicExtAppletContainerManager.desktop</launchable>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://media.githubusercontent.com/media/cosmic-utils/cosmic-ext-applet-container-manager/main/screenshots/container-manager-popup.png</image>
+      <caption>Container Manager applet showing example Podman containers</caption>
+    </screenshot>
+  </screenshots>
+  <provides>
+    <id>com.system76.CosmicApplet</id>
+    <binary>cosmic-ext-applet-container-manager</binary>
+  </provides>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <control>touch</control>
+  </supports>
+  <categories>
+    <category>System</category>
+    <category>Utility</category>
+  </categories>
+  <keywords>
+    <keyword>containers</keyword>
+    <keyword>docker</keyword>
+    <keyword>podman</keyword>
+  </keywords>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.0" date="2026-09-14">
+      <description>
+        <p>Initial release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

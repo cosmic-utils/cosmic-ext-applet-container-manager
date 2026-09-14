@@ -1,0 +1,15 @@
+app-title = Container Manager
+app-comment = Manage Docker and Podman containers from COSMIC™ Desktop
+app-keywords = Containers;Docker;Podman;
+loading = Loading containers…
+empty = No containers found
+refresh = Refresh
+start = Start
+stop = Stop
+restart = Restart
+delete = Delete
+confirm-delete = Confirm delete
+delete-warning = Permanently delete this container?
+cancel = Cancel
+working = Working…
+available-engines = Available engines: { $engines }

@@ -1,0 +1,27 @@
+[package]
+name = "cosmic-ext-applet-container-manager"
+version = "0.1.0"
+edition = "2024"
+authors = ["Frederic Laing <dev@fredfunk.tech>"]
+license = "GPL-3.0-only"
+description = "A COSMIC™ Desktop panel applet for managing Docker and Podman containers"
+
+[features]
+flatpak = []
+
+[build-dependencies]
+xdgen = "0.1"
+
+[dependencies]
+i18n-embed-fl = "0.10"
+nix = { version = "0.30", features = ["fs", "signal"] }
+rust-embed = "8.11"
+tokio = { version = "1.52.0", features = ["process", "rt-multi-thread", "time"] }
+
+[dependencies.i18n-embed]
+version = "0.16"
+features = ["fluent-system", "desktop-requester"]
+
+[dependencies.libcosmic]
+git = "https://github.com/pop-os/libcosmic.git"
+features = ["applet", "applet-token", "tokio", "wayland", "winit"]

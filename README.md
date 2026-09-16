@@ -1,5 +1,9 @@
 # Container Manager Applet for COSMIC™ Desktop
 
+[![Sponsor](https://img.shields.io/badge/sponsor-FreddyFunk-ea4aaa?logo=github-sponsors)](https://github.com/sponsors/FreddyFunk)
+[![CI](https://github.com/cosmic-utils/cosmic-ext-applet-container-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/cosmic-utils/cosmic-ext-applet-container-manager/actions/workflows/ci.yml)
+[![Translation status](https://hosted.weblate.org/widget/cosmic-utils/applet-container-manager/svg-badge.svg)](https://hosted.weblate.org/engage/cosmic-utils/)
+
 A libcosmic panel applet that discovers local Docker and Podman containers and lets you start, stop, restart, or remove them.
 
 ![Container Manager applet showing example Podman containers](screenshots/container-manager-popup.png)

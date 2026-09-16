@@ -1,0 +1,15 @@
+app-title = Správce kontejnerů
+app-comment = Spravujte kontejnery Docker a Podman z prostředí COSMIC™ Desktop
+app-keywords = Kontejnery;Docker;Podman;
+loading = Načítání kontejnerů…
+empty = Nenalezeny žádné kontejnery
+refresh = Obnovit
+start = Spustit
+stop = Zastavit
+restart = Restartovat
+delete = Smazat
+confirm-delete = Potvrdit smazání
+delete-warning = Trvale smazat tento kontejner?
+cancel = Zrušit
+working = Probíhá…
+available-engines = Dostupné enginy: { $engines }

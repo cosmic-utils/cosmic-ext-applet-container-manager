@@ -1,0 +1,15 @@
+app-title = Behållare hanterare
+app-comment = Hantera Docker och Podman behållare från COSMIC™ skrivbordet
+app-keywords = Behållare ;Docker;Podman;
+loading = Laddar behållare …
+empty = Inga behållare hittades
+refresh = Uppdatera
+start = Starta
+stop = Stoppa
+restart = Starta om
+delete = Radera
+confirm-delete = Bekräfta borttagning
+delete-warning = Vill du ta bort den här behållaren permanent?
+cancel = Avbryt
+working = Jobbar…
+available-engines = Tillgängliga motorer: { $engines }

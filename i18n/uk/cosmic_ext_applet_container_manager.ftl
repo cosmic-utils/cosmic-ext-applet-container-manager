@@ -1,0 +1,15 @@
+app-comment = Керуйте контейнерами Docker і Podman зі стільниці COSMIC™
+app-keywords = Контейнери;Containers;Docker;Podman;
+loading = Завантаження контейнерів…
+empty = Контейнерів не знайдено
+refresh = Оновити
+start = Запустити
+stop = Зупинити
+restart = Перезапустити
+delete = Видалити
+confirm-delete = Підтвердження видалення
+delete-warning = Видалити цей контейнер назавжди?
+cancel = Скасувати
+working = Обробка…
+available-engines = Доступні рушії: { $engines }
+app-title = Центр контейнерів

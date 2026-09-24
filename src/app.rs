@@ -9,10 +9,10 @@ use cosmic_ext_applet_container_manager::{
 
 use crate::fl;
 use cosmic::iced::advanced::text::EllipsizeHeightLimit;
-use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup};
 use cosmic::iced::widget::text::{Ellipsize, Wrapping};
 use cosmic::iced::{Alignment, Length, Limits, Subscription, window::Id};
 use cosmic::prelude::*;
+use cosmic::surface::action::{app_popup, destroy_popup};
 use cosmic::widget;
 use cosmic::widget::space::horizontal as horizontal_space;
 
@@ -105,6 +105,27 @@ fn visible_actions(container: &Container) -> Vec<Action> {
 
 fn engine_names(backends: &BTreeSet<Backend>) -> String {
     backends.iter().map(|backend| backend.name()).collect::<Vec<_>>().join(", ")
+}
+
+fn popup_surface_action() -> cosmic::surface::Action {
+    app_popup::<AppModel>(
+        |_| Default::default(),
+        |app| {
+            let id = Id::unique();
+            app.popup = Some(id);
+            let mut settings = app.core.applet.get_popup_settings(
+                app.core.main_window_id().expect("main applet window"),
+                id,
+                None,
+                None,
+                None,
+            );
+            settings.positioner.size_limits =
+                Limits::NONE.min_width(360.0).max_width(520.0).min_height(180.0).max_height(720.0);
+            settings
+        },
+        None,
+    )
 }
 
 impl cosmic::Application for AppModel {
@@ -290,23 +311,9 @@ impl cosmic::Application for AppModel {
         match message {
             Message::TogglePopup => {
                 if let Some(id) = self.popup.take() {
-                    return destroy_popup(id);
+                    return cosmic::surface::surface_task(destroy_popup(id));
                 }
-                let id = Id::unique();
-                self.popup = Some(id);
-                let mut settings = self.core.applet.get_popup_settings(
-                    self.core.main_window_id().expect("main applet window"),
-                    id,
-                    None,
-                    None,
-                    None,
-                );
-                settings.positioner.size_limits = Limits::NONE
-                    .min_width(360.0)
-                    .max_width(520.0)
-                    .min_height(180.0)
-                    .max_height(720.0);
-                let popup = get_popup(settings);
+                let popup = cosmic::surface::surface_task(popup_surface_action());
                 if !self.refreshing {
                     self.refreshing = true;
                     return Task::batch([popup, Self::refresh_task()]);

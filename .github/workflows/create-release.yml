@@ -1,0 +1,228 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version number (for example, 0.1.1). Leave empty to increment the patch version.
+        required: false
+        type: string
+
+concurrency:
+  group: create-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  create-tag:
+    name: Create release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Require the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$REF_NAME" != "$DEFAULT_BRANCH" ]; then
+            echo "Run this workflow from $DEFAULT_BRANCH, not $REF_NAME."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Determine version
+        id: version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "$REQUESTED_VERSION" ]; then
+            VERSION="${REQUESTED_VERSION#v}"
+          else
+            LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+            if [ -z "$LATEST_TAG" ]; then
+              VERSION="0.1.0"
+            else
+              CURRENT="${LATEST_TAG#v}"
+              IFS=. read -r MAJOR MINOR PATCH <<< "$CURRENT"
+              VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+            fi
+          fi
+
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version: $VERSION (expected MAJOR.MINOR.PATCH)"
+            exit 1
+          fi
+
+          TAG="v${VERSION}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists."
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${TAG}$" | head -1 || true)
+
+          {
+            echo "## What's Changed"
+            if [ -n "$PREVIOUS_TAG" ]; then
+              PREVIOUS_DATE=$(git log -1 --format=%cI "$PREVIOUS_TAG")
+              gh pr list --state merged --base "$DEFAULT_BRANCH" --limit 1000 \
+                --json number,title,author,mergedAt \
+                --jq "[.[] | select(.mergedAt > \"$PREVIOUS_DATE\")] | sort_by(.mergedAt) | .[] | \"* \(.title) by @\(.author.login) in ${{ github.server_url }}/${{ github.repository }}/pull/\(.number)\""
+              echo
+              echo "**Full Changelog**: ${{ github.server_url }}/${{ github.repository }}/compare/${PREVIOUS_TAG}...${TAG}"
+            else
+              gh pr list --state merged --base "$DEFAULT_BRANCH" --limit 1000 \
+                --json number,title,author,mergedAt \
+                --jq "sort_by(.mergedAt) | .[] | \"* \(.title) by @\(.author.login) in ${{ github.server_url }}/${{ github.repository }}/pull/\(.number)\""
+            fi
+          } > release-notes.md
+
+          if ! grep -q '^\* ' release-notes.md; then
+            printf '%s\n' "## What's Changed" '' '* Bug fixes and improvements.' > release-notes.md
+          fi
+
+      - name: Update release metadata
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from datetime import date
+          from html import escape
+          from pathlib import Path
+          import os
+          import re
+          import xml.etree.ElementTree as ET
+
+          version = os.environ["VERSION"]
+
+          cargo_toml = Path("Cargo.toml")
+          text = cargo_toml.read_text()
+          text, count = re.subn(
+              r'(?m)^(version = ")[^"]+("\s*)$',
+              rf'\g<1>{version}\g<2>',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Could not update the package version in Cargo.toml")
+          cargo_toml.write_text(text)
+
+          cargo_lock = Path("Cargo.lock")
+          text = cargo_lock.read_text()
+          pattern = (
+              r'(\[\[package\]\]\n'
+              r'name = "cosmic-ext-applet-container-manager"\n'
+              r'version = ")[^"]+("\n)'
+          )
+          text, count = re.subn(pattern, rf'\g<1>{version}\g<2>', text, count=1)
+          if count != 1:
+              raise SystemExit("Could not update the package version in Cargo.lock")
+          cargo_lock.write_text(text)
+
+          notes = []
+          for line in Path("release-notes.md").read_text().splitlines():
+              match = re.match(r"\* (.+?) by @", line)
+              if match:
+                  notes.append(match.group(1).strip())
+          if not notes:
+              notes = ["Bug fixes and improvements."]
+
+          metainfo = Path("resources/app.metainfo.xml")
+          text = metainfo.read_text()
+          root = ET.fromstring(text)
+          releases = root.find("releases")
+          if releases is not None and any(
+              release.get("version") == version for release in releases.findall("release")
+          ):
+              raise SystemExit(f"Release {version} already exists in app.metainfo.xml")
+
+          items = "\n".join(f"          <li>{escape(note)}</li>" for note in notes)
+          release = (
+              f'    <release version="{version}" date="{date.today().isoformat()}">\n'
+              "      <description>\n"
+              f"        <p>Release {version} includes the following changes:</p>\n"
+              "        <ul>\n"
+              f"{items}\n"
+              "        </ul>\n"
+              "      </description>\n"
+              "    </release>\n"
+          )
+          marker = "  <releases>\n"
+          if marker not in text:
+              raise SystemExit("Could not find the releases section in app.metainfo.xml")
+          metainfo.write_text(text.replace(marker, marker + release, 1))
+          ET.parse(metainfo)
+          PY
+
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Commit release changes
+        id: commit
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml Cargo.lock resources/app.metainfo.xml
+          git commit -m "Release $TAG"
+          git push origin "$DEFAULT_BRANCH"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        env:
+          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git tag -a "$TAG" "$COMMIT_SHA" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Summary
+        env:
+          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          {
+            echo "## Release tag created"
+            echo
+            echo "- Version: $VERSION"
+            echo "- Tag: $TAG"
+            echo "- Commit: $COMMIT_SHA"
+            echo
+            echo "The Release workflow will build and publish the artifacts."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish-release:
+    name: Build and publish release
+    needs: create-tag
+    permissions:
+      contents: write
+      pull-requests: read
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.create-tag.outputs.tag }}

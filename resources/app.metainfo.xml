@@ -8,6 +8,7 @@
   <developer id="org.cosmic_utils">
     <name>Frederic Laing</name>
   </developer>
+  <developer_name>Frederic Laing</developer_name>
   <url type="homepage">https://github.com/cosmic-utils/cosmic-ext-applet-container-manager</url>
   <url type="bugtracker">https://github.com/cosmic-utils/cosmic-ext-applet-container-manager/issues</url>
   <description>

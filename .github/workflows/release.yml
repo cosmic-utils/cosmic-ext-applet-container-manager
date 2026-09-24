@@ -1,0 +1,200 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_call:
+    inputs:
+      tag:
+        description: Existing release tag to build and publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-binary:
+    name: Build binary (x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Validate release tag
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release tag: $TAG"
+            exit 1
+          fi
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: 1.98.0
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config \
+            libwayland-dev \
+            libxkbcommon-dev
+
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      - name: Build release binary
+        run: just build-release
+
+      - name: Package binary
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp target/release/cosmic-ext-applet-container-manager dist/
+          tar -C dist -czf cosmic-ext-applet-container-manager-x86_64-linux.tar.gz \
+            cosmic-ext-applet-container-manager
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: binary-x86_64
+          path: cosmic-ext-applet-container-manager-x86_64-linux.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  build-flatpak:
+    name: Build Flatpak (x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Install Flatpak builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            flatpak \
+            flatpak-builder
+          flatpak remote-add --if-not-exists --user flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Build Flatpak bundle
+        run: |
+          set -euo pipefail
+          flatpak-builder \
+            --force-clean \
+            --install-deps-from=flathub \
+            --repo=flatpak-repo \
+            --user \
+            flatpak-build \
+            flatpak/org.cosmic_utils.CosmicExtAppletContainerManager.json
+          flatpak build-bundle \
+            flatpak-repo \
+            cosmic-ext-applet-container-manager-x86_64.flatpak \
+            org.cosmic_utils.CosmicExtAppletContainerManager \
+            --arch=x86_64
+          test -f cosmic-ext-applet-container-manager-x86_64.flatpak
+
+      - name: Upload Flatpak artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: flatpak-x86_64
+          path: cosmic-ext-applet-container-manager-x86_64.flatpak
+          if-no-files-found: error
+          retention-days: 1
+
+  create-release:
+    name: Create GitHub release
+    needs: [build-binary, build-flatpak]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Download artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          mv artifacts/binary-x86_64/cosmic-ext-applet-container-manager-x86_64-linux.tar.gz release-assets/
+          mv artifacts/flatpak-x86_64/cosmic-ext-applet-container-manager-x86_64.flatpak release-assets/
+          git archive \
+            --format=zip \
+            --prefix="cosmic-ext-applet-container-manager-${{ inputs.tag || github.ref_name }}/" \
+            -o "release-assets/cosmic-ext-applet-container-manager-${{ inputs.tag || github.ref_name }}-source.zip" \
+            HEAD
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${TAG}$" | head -1 || true)
+
+          {
+            echo "## What's Changed"
+            if [ -n "$PREVIOUS_TAG" ]; then
+              PREVIOUS_DATE=$(git log -1 --format=%cI "$PREVIOUS_TAG")
+              gh pr list --state merged --base "${{ github.event.repository.default_branch }}" --limit 1000 \
+                --json number,title,author,mergedAt \
+                --jq "[.[] | select(.mergedAt > \"$PREVIOUS_DATE\")] | sort_by(.mergedAt) | .[] | \"* \(.title) by @\(.author.login) in ${{ github.server_url }}/${{ github.repository }}/pull/\(.number)\""
+              echo
+              echo "**Full Changelog**: ${{ github.server_url }}/${{ github.repository }}/compare/${PREVIOUS_TAG}...${TAG}"
+            else
+              gh pr list --state merged --base "${{ github.event.repository.default_branch }}" --limit 1000 \
+                --json number,title,author,mergedAt \
+                --jq "sort_by(.mergedAt) | .[] | \"* \(.title) by @\(.author.login) in ${{ github.server_url }}/${{ github.repository }}/pull/\(.number)\""
+            fi
+
+            cat <<'EOF'
+
+          ## Installation
+
+          ### Flatpak
+
+          ```sh
+          flatpak install ./cosmic-ext-applet-container-manager-x86_64.flatpak
+          ```
+
+          ### Binary
+
+          ```sh
+          tar -xzf cosmic-ext-applet-container-manager-x86_64-linux.tar.gz
+          ./cosmic-ext-applet-container-manager
+          ```
+
+          The native binary requires COSMIC and libcosmic runtime dependencies supplied by the distribution.
+          EOF
+          } > release-notes.md
+
+          gh release create "$TAG" \
+            --title "Container Manager $TAG" \
+            --notes-file release-notes.md \
+            release-assets/*

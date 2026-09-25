@@ -87,9 +87,19 @@ jobs:
             elfutils \
             flatpak \
             flatpak-builder \
+            python3-pip \
             librsvg2-common
           flatpak remote-add --if-not-exists --user flathub \
             https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      - name: Install Cargo source generator dependencies
+        run: pip install aiohttp tomlkit
+
+      - name: Regenerate Flatpak Cargo sources
+        run: just flatpak-cargo-sources
 
       - name: Build Flatpak
         run: |

@@ -8,6 +8,7 @@ flatpak-manifest := 'flatpak' / appid + '.json'
 flatpak-cache-dir := env('HOME') / '.cache' / name
 flatpak-build-dir := flatpak-cache-dir / 'build'
 flatpak-state-dir := flatpak-cache-dir / 'state'
+flatpak-cargo-generator-url := 'https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/41c20aa10819cdb2a4f3ca171758a96d1955c018/cargo/flatpak-cargo-generator.py'
 
 appdata-dst := base-dir / 'share/metainfo' / appid + '.metainfo.xml'
 desktop-dst := base-dir / 'share/applications' / appid + '.desktop'
@@ -59,10 +60,25 @@ install: build-release
 uninstall:
     rm -f {{ bin-dst }} {{ desktop-dst }} {{ appdata-dst }} {{ icon-dst }}
 
-flatpak-build:
+flatpak-cargo-sources:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    curl -fsSLo flatpak-cargo-generator.py '{{ flatpak-cargo-generator-url }}'
+    if python3 -c 'import aiohttp, tomlkit' 2>/dev/null; then
+        python3 flatpak-cargo-generator.py Cargo.lock -o flatpak/cargo-sources.json
+    else
+        if [ ! -x .flatpak-venv/bin/python3 ]; then
+            rm -rf .flatpak-venv
+            python3 -m venv .flatpak-venv
+        fi
+        .flatpak-venv/bin/pip install --quiet aiohttp tomlkit
+        .flatpak-venv/bin/python3 flatpak-cargo-generator.py Cargo.lock -o flatpak/cargo-sources.json
+    fi
+
+flatpak-build: flatpak-cargo-sources
     flatpak run org.flatpak.Builder --force-clean --user --install-deps-from=flathub --state-dir='{{ flatpak-state-dir }}' '{{ flatpak-build-dir }}' '{{ flatpak-manifest }}'
 
-flatpak-install:
+flatpak-install: flatpak-cargo-sources
     flatpak run org.flatpak.Builder --force-clean --user --install --install-deps-from=flathub --state-dir='{{ flatpak-state-dir }}' '{{ flatpak-build-dir }}' '{{ flatpak-manifest }}'
 
 flatpak-uninstall:

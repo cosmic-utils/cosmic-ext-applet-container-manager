@@ -1,0 +1,116 @@
+name: Update Flatpak Runtime
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-runtime:
+    name: Check for Flatpak runtime updates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Flatpak builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            flatpak \
+            flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Check for runtime updates
+        id: check
+        run: |
+          set -euo pipefail
+          CURRENT_VERSION=$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          manifest = json.loads(
+              Path("flatpak/org.cosmic_utils.CosmicExtAppletContainerManager.json").read_text()
+          )
+          print(manifest["runtime-version"])
+          PY
+          )
+
+          LATEST_VERSION=$(flatpak remote-ls --user flathub --runtime --columns=application,branch \
+            | awk '$1 == "org.freedesktop.Platform" && $2 ~ /^[0-9]+\.[0-9]+$/ { print $2 }' \
+            | sort -t. -k1,1n -k2,2n \
+            | tail -1)
+
+          if [ -z "$LATEST_VERSION" ]; then
+            echo "No Freedesktop Platform runtime was found on Flathub."
+            exit 1
+          fi
+
+          flatpak remote-info --user flathub \
+            "org.freedesktop.Sdk.Extension.rust-stable//$LATEST_VERSION" >/dev/null
+
+          echo "current=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST_VERSION" >> "$GITHUB_OUTPUT"
+
+          if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
+            echo "update_available=false" >> "$GITHUB_OUTPUT"
+            echo "Already using the latest runtime: $CURRENT_VERSION"
+          else
+            echo "update_available=true" >> "$GITHUB_OUTPUT"
+            echo "Runtime update available: $CURRENT_VERSION -> $LATEST_VERSION"
+          fi
+
+      - name: Update manifest
+        if: steps.check.outputs.update_available == 'true'
+        env:
+          LATEST_VERSION: ${{ steps.check.outputs.latest }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path("flatpak/org.cosmic_utils.CosmicExtAppletContainerManager.json")
+          manifest = json.loads(path.read_text())
+          manifest["runtime-version"] = os.environ["LATEST_VERSION"]
+          path.write_text(json.dumps(manifest, indent=2) + "\n")
+          PY
+
+      - name: Build updated Flatpak
+        if: steps.check.outputs.update_available == 'true'
+        run: |
+          flatpak-builder \
+            --force-clean \
+            --install-deps-from=flathub \
+            --user \
+            flatpak-build \
+            flatpak/org.cosmic_utils.CosmicExtAppletContainerManager.json
+
+      - name: Create pull request
+        id: create-pr
+        if: steps.check.outputs.update_available == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "deps(flatpak): update runtime to ${{ steps.check.outputs.latest }}"
+          title: "deps(flatpak): update Freedesktop runtime to ${{ steps.check.outputs.latest }}"
+          body: |
+            Updates `org.freedesktop.Platform` and `org.freedesktop.Sdk` from `${{ steps.check.outputs.current }}` to `${{ steps.check.outputs.latest }}`.
+
+            Validation:
+            - The updated x86_64 Flatpak was built successfully by this workflow.
+            - Runtime testing is still required before merge.
+          branch: deps/flatpak-runtime-${{ steps.check.outputs.latest }}
+          delete-branch: true
+
+      - name: Run CI on pull request branch
+        if: ${{ steps.create-pr.outputs.pull-request-operation == 'created' || steps.create-pr.outputs.pull-request-operation == 'updated' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run ci.yml --ref "${{ steps.create-pr.outputs.pull-request-branch }}"

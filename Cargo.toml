@@ -14,7 +14,7 @@ xdgen = "0.1"
 
 [dependencies]
 i18n-embed-fl = "0.10"
-nix = { version = "0.30", features = ["fs", "signal"] }
+nix = { version = "0.31", features = ["fs", "signal"] }
 rust-embed = "8.11"
 tokio = { version = "1.52.0", features = ["process", "rt-multi-thread", "time"] }
 

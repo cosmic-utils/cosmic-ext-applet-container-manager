@@ -107,7 +107,7 @@ fn engine_names(backends: &BTreeSet<Backend>) -> String {
     backends.iter().map(|backend| backend.name()).collect::<Vec<_>>().join(", ")
 }
 
-fn popup_surface_action() -> cosmic::surface::Action {
+fn popup_surface_action() -> cosmic::surface::Action<Message> {
     app_popup::<AppModel>(
         |_| Default::default(),
         |app| {

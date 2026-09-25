@@ -1,0 +1,29 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: deps(cargo)
+    open-pull-requests-limit: 10
+    groups:
+      libcosmic:
+        patterns:
+          - libcosmic
+          - iced_core
+          - iced_futures
+          - iced_wgpu
+      rust-dependencies:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: deps(actions)

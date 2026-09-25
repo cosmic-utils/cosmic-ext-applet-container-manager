@@ -5,6 +5,8 @@ debug/
 target/
 vendor/
 vendor.tar
+.flatpak-venv/
+flatpak-cargo-generator.py
 debian/*
 !debian/changelog
 !debian/control

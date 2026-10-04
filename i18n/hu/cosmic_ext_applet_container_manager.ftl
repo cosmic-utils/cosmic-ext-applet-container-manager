@@ -1,0 +1,15 @@
+app-title = Konténerkezelő
+app-comment = Docker- és Podman-konténerek kezelése a COSMIC™ asztali környezetből
+app-keywords = Konténerek;Docker;Podman;
+loading = Konténerek betöltése…
+empty = Nem találhatók konténerek
+refresh = Frissítés
+start = Indítás
+stop = Leállítás
+restart = Újraindítás
+delete = Törlés
+confirm-delete = Törlés megerősítése
+delete-warning = Véglegesen törlöd ezt a konténert?
+cancel = Mégse
+working = Feldolgozás…
+available-engines = Elérhető motorok: { $engines }

@@ -75,6 +75,6 @@ GPL-3.0-only.
 
 ## Dependency update policy
 
-Dependabot checks Cargo and GitHub Actions daily at 06:00 UTC. Cargo minor/patch updates are grouped except `libcosmic` and `iced_*`; libcosmic and major updates remain individual PRs. Manifest requirements increase with accepted updates. The compiler in `rust-toolchain.toml` is checked Mondays at 06:15 UTC and is the native CI compiler source (not a package MSRV declaration).
+Dependabot checks Cargo and GitHub Actions daily at 06:00 UTC. Cargo minor/patch updates are grouped except `libcosmic` and `iced_*`; libcosmic and major updates remain individual PRs. Cargo uses the `auto` strategy: compatible releases update the lockfile; manifest requirements change when needed to allow a new release. The compiler in `rust-toolchain.toml` is checked Mondays at 06:15 UTC and is the native CI compiler source (not a package MSRV declaration).
 
 Flatpak generator Python dependencies are pinned in `requirements-build.txt`, checked Mondays at 06:30 UTC, and installed by `just flatpak-cargo-sources` in an isolated uv or venv environment both locally and in CI. Regenerate `flatpak/cargo-sources.json` after lockfile or helper changes. The generator revision is retained while its script is unchanged. The Flatpak runtime remains 25.08 to match the published COSMIC BaseApp stable; its SDK supplies the sandbox compiler separately. This applet has no cross/musl images or deterministic preview build environment.

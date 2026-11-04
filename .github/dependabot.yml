@@ -1,29 +1,64 @@
 version: 2
 updates:
-  - package-ecosystem: cargo
-    directory: /
+  # Cargo dependencies
+  - package-ecosystem: "cargo"
+    directory: "/"
     schedule:
-      interval: daily
+      interval: "daily"
+      time: "06:00"
+      timezone: "UTC"
+    versioning-strategy: "auto"
     commit-message:
-      prefix: deps(cargo)
+      prefix: "deps(cargo)"
     open-pull-requests-limit: 10
     groups:
-      libcosmic:
-        patterns:
-          - libcosmic
-          - iced_core
-          - iced_futures
-          - iced_wgpu
+      # Keep libcosmic and its Iced crates outside the registry dependency group.
+      # Major upgrades remain individual PRs.
       rust-dependencies:
         patterns:
-          - '*'
+          - "*"
+        exclude-patterns:
+          - "libcosmic"
+          - "iced_*"
         update-types:
-          - minor
-          - patch
+          - "minor"
+          - "patch"
 
-  - package-ecosystem: github-actions
-    directory: /
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
     schedule:
-      interval: daily
+      interval: "daily"
+      time: "06:00"
+      timezone: "UTC"
     commit-message:
-      prefix: deps(actions)
+      prefix: "deps(actions)"
+
+  # rust-toolchain.toml is the compiler-version source for native CI builds.
+  - package-ecosystem: "rust-toolchain"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:15"
+      timezone: "UTC"
+    commit-message:
+      prefix: "deps(toolchain)"
+
+  # Shared Python dependencies used by local and CI build tooling.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:30"
+      timezone: "UTC"
+    commit-message:
+      prefix: "deps(build)"
+    groups:
+      python-build-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

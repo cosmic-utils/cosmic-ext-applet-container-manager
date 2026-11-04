@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - Cargo.lock
+      - requirements-build.txt
+      - justfile
   workflow_dispatch:
 
 permissions:
@@ -20,13 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
-
-      - name: Install generator dependencies
-        run: pip install aiohttp tomlkit
 
       - name: Regenerate Cargo sources
         run: just flatpak-cargo-sources

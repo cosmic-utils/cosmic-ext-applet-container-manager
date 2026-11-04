@@ -8,7 +8,6 @@ flatpak-manifest := 'flatpak' / appid + '.json'
 flatpak-cache-dir := env('HOME') / '.cache' / name
 flatpak-build-dir := flatpak-cache-dir / 'build'
 flatpak-state-dir := flatpak-cache-dir / 'state'
-flatpak-cargo-generator-url := 'https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/41c20aa10819cdb2a4f3ca171758a96d1955c018/cargo/flatpak-cargo-generator.py'
 
 appdata-dst := base-dir / 'share/metainfo' / appid + '.metainfo.xml'
 desktop-dst := base-dir / 'share/applications' / appid + '.desktop'
@@ -63,17 +62,22 @@ uninstall:
 flatpak-cargo-sources:
     #!/usr/bin/env bash
     set -euo pipefail
-    curl -fsSLo flatpak-cargo-generator.py '{{ flatpak-cargo-generator-url }}'
-    if python3 -c 'import aiohttp, tomlkit' 2>/dev/null; then
-        python3 flatpak-cargo-generator.py Cargo.lock -o flatpak/cargo-sources.json
-    else
-        if [ ! -x .flatpak-venv/bin/python3 ]; then
-            rm -rf .flatpak-venv
-            python3 -m venv .flatpak-venv
-        fi
-        .flatpak-venv/bin/pip install --quiet aiohttp tomlkit
-        .flatpak-venv/bin/python3 flatpak-cargo-generator.py Cargo.lock -o flatpak/cargo-sources.json
+    generator_sha256=0a2db6be87d75910facef28ab46d4d6460802e8419ab850d0caa6a364d26b380
+    if ! printf '%s  %s\n' "$generator_sha256" flatpak-cargo-generator.py | sha256sum --check --status 2>/dev/null; then
+        generator_tmp="$(mktemp)"
+        trap 'rm -f "$generator_tmp"' EXIT
+        curl -fLo "$generator_tmp" https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/41c20aa10819cdb2a4f3ca171758a96d1955c018/cargo/flatpak-cargo-generator.py
+        printf '%s  %s\n' "$generator_sha256" "$generator_tmp" | sha256sum --check --status
+        mv "$generator_tmp" flatpak-cargo-generator.py
     fi
+    if command -v uv >/dev/null 2>&1; then
+        uv run --no-project --with-requirements requirements-build.txt python3 flatpak-cargo-generator.py Cargo.lock -o flatpak/cargo-sources.json
+    else
+        python3 -m venv .flatpak-venv
+        .flatpak-venv/bin/python -m pip install --quiet --requirement requirements-build.txt
+        .flatpak-venv/bin/python flatpak-cargo-generator.py Cargo.lock -o flatpak/cargo-sources.json
+    fi
+
 
 flatpak-build: flatpak-cargo-sources
     flatpak run org.flatpak.Builder --force-clean --user --install-deps-from=flathub --state-dir='{{ flatpak-state-dir }}' '{{ flatpak-build-dir }}' '{{ flatpak-manifest }}'

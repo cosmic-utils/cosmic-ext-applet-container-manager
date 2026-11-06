@@ -42,6 +42,32 @@
   </keywords>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="1.11.0" date="2026-11-06">
+      <description>
+        <p>Release 1.11.0 includes the following changes:</p>
+        <ul>
+          <li>Add dependency update automation</li>
+          <li>deps(actions): Bump Swatinem/rust-cache from 49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c to 6323deb102c322ba6fcbdcafc7e3dddab59af2b6</li>
+          <li>deps(cargo): Bump nix from 0.30.1 to 0.31.3</li>
+          <li>Update libcosmic</li>
+          <li>deps(actions): Bump dtolnay/rust-toolchain from 02cb101ec7c40f2c49e1d9714d64511d8e1b74de to 7e38f4b43b4db5c8dd498af069a4f6196df1d067</li>
+          <li>deps(cargo): Bump libcosmic from `03d7dcb` to `6af8b70` in the libcosmic group</li>
+          <li>deps(cargo): Bump tokio from 1.53.1 to 1.53.2 in the rust-dependencies group</li>
+          <li>deps(cargo): Bump libcosmic from `6af8b70` to `5a8bd94` in the libcosmic group</li>
+          <li>deps(actions): Bump dtolnay/rust-toolchain from 7e38f4b43b4db5c8dd498af069a4f6196df1d067 to 683b588c487a69d01f6c6ddf40f036ff682cc2c8</li>
+          <li>deps(cargo): Bump rust-embed from 8.12.0 to 8.13.0 in the rust-dependencies group</li>
+          <li>deps(actions): Bump actions/upload-artifact from 7.0.1 to 7.0.2</li>
+          <li>deps(actions): Bump actions/download-artifact from 8.0.1 to 8.0.2</li>
+          <li>deps(cargo): Bump libcosmic from `5a8bd94` to `60ad2cc` in the libcosmic group</li>
+          <li>chore(l10n): update translations</li>
+          <li>deps(cargo): Bump libcosmic from `60ad2cc` to `3a37c8b` in the libcosmic group</li>
+          <li>deps(cargo): Bump tokio from 1.53.2 to 1.53.3 in the rust-dependencies group</li>
+          <li>deps(actions): Bump Swatinem/rust-cache from 2.9.2 to 2.9.3</li>
+          <li>deps: refresh dependencies and automation</li>
+          <li>deps(cargo): bump libcosmic from `daca62b` to `7cd76ae`</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.1" date="2026-09-24">
       <description>
         <p>Release 0.1.1 includes the following changes:</p>

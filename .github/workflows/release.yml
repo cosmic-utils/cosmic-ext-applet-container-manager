@@ -91,7 +91,7 @@ jobs:
       - name: Install Flatpak builder
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get install -y \
             flatpak \
             flatpak-builder
           flatpak remote-add --if-not-exists --user flathub \
